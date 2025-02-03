@@ -9,7 +9,7 @@ const MAX_SECONDS_PER_DAY = 60 * 60; // 1 hour
 const ALLOW_UNLIMITED_TIME_AFTER = 19 * 60 + 30; // 7:30 PM
 
 const check = async () => {
-  console.log("Checking...");
+  console.log("Checking...", new Date().toISOString());
 
   const lgtv = LGTV({
     url: `ws://${HOST}:3000`,
@@ -66,14 +66,10 @@ const check = async () => {
     // If we're past the limit, turn off the TV
     if (isPastLimit && !isPastAlwaysAllowedTime) {
       console.log("TV is on past the limit, turning off");
-
-      // TEMPORARY: Don't turn off the TV
-      lgtv.disconnect();
-
-      // lgtv.request('ssap://system/turnOff', function (err, res) {
-      // 	console.log(res);
-      // 	lgtv.disconnect();
-      // });
+      lgtv.request("ssap://system/turnOff", function (err, res) {
+        console.log(res);
+        lgtv.disconnect();
+      });
     } else {
       console.log("TV is on, but not past the limit");
       lgtv.disconnect();
