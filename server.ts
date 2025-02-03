@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync } from "fs";
 dotenv.config();
 
 const HOST = process.env.TV_HOST || "lgwebostv";
-const INTERVAL = 3000;
+const INTERVAL = 30000;
 const MAX_SECONDS_PER_DAY = 60 * 60; // 1 hour
 const ALLOW_UNLIMITED_TIME_AFTER = 19 * 60 + 30; // 7:30 PM
 
@@ -14,6 +14,7 @@ const check = async () => {
   const lgtv = LGTV({
     url: `ws://${HOST}:3000`,
     timeout: 1000,
+    reconnect: 500,
   });
 
   lgtv.on("error", function (err) {
