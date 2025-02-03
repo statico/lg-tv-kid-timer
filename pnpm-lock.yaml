@@ -18,6 +18,9 @@ importers:
       '@types/lgtv2':
         specifier: ^1.4.5
         version: 1.4.5
+      prettier:
+        specifier: ^3.4.2
+        version: 3.4.2
 
 packages:
 
@@ -91,6 +94,11 @@ packages:
 
   persist-path@1.0.2:
     resolution: {integrity: sha512-IBSK3cuCZJSesAq9s0DZbeLn+E8xqJbY/3L+VjNxxwLp/zjTATn8tYJQ44RUhOrLNEexxkC9surCdjJ+iVpa4g==}
+
+  prettier@3.4.2:
+    resolution: {integrity: sha512-e9MewbtFo+Fevyuxn/4rrcDAaq0IYxPGLvObpQjiZBMAzB9IGmzlnG9RZy3FFas+eBMu2vA0CszMeduow5dIuQ==}
+    engines: {node: '>=14'}
+    hasBin: true
 
   type@2.7.3:
     resolution: {integrity: sha512-8j+1QmAbPvLZow5Qpi6NCaN8FB60p/6x8/vfNqOk/hC+HuvFZhL4+WfekuhQLiqFZXOgQdrs3B+XxEmCc6b3FQ==}
@@ -191,6 +199,8 @@ snapshots:
   node-gyp-build@4.8.4: {}
 
   persist-path@1.0.2: {}
+
+  prettier@3.4.2: {}
 
   type@2.7.3: {}
 
