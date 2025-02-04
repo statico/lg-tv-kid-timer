@@ -4,9 +4,10 @@ import { readFileSync, writeFileSync } from "fs";
 dotenv.config();
 
 const HOST = process.env.TV_HOST || "lgwebostv";
-const INTERVAL = 30000;
-const MAX_SECONDS_PER_DAY = 60 * 60; // 1 hour
-const ALLOW_UNLIMITED_TIME_AFTER = 19 * 60 + 30; // 7:30 PM
+const INTERVAL_SECONDS = 5;
+const MAX_TIME_PER_DAY_SECONDS = 60 * 60; // 1 hour
+const ALLOW_AFTER_TIME = (19 * 60 + 30) * 60; // 7:30 PM
+const DISALLOW_BEFORE_TIME = 8 * 60 * 60; // 8:00 AM
 
 const check = async () => {
   console.log("Checking...", new Date().toISOString());
@@ -14,11 +15,12 @@ const check = async () => {
   const lgtv = LGTV({
     url: `ws://${HOST}:3000`,
     timeout: 1000,
-    reconnect: 500,
+    reconnect: 0,
   });
 
   lgtv.on("error", function (err) {
     console.log("TV is off");
+    lgtv.disconnect();
   });
 
   lgtv.on("connect", function () {
@@ -45,23 +47,26 @@ const check = async () => {
     }
 
     // Increment secondsOn by INTERVAL
-    state.secondsOn += INTERVAL;
+    state.secondsOn += INTERVAL_SECONDS;
 
     // Write state.json
     writeFileSync("state.json", JSON.stringify(state));
 
-    // Are we past the limit?
-    const isPastLimit = state.secondsOn > MAX_SECONDS_PER_DAY;
-    console.log("isPastLimit", isPastLimit);
-
-    // Are we past the always allowed time?
+    // Are we before the allowed time?
     const currentTime = new Date();
     const secondsSinceMidnight =
       currentTime.getHours() * 3600 +
       currentTime.getMinutes() * 60 +
       currentTime.getSeconds();
-    const isPastAlwaysAllowedTime =
-      secondsSinceMidnight > ALLOW_UNLIMITED_TIME_AFTER;
+    const isBeforeAllowedTime = secondsSinceMidnight < DISALLOW_BEFORE_TIME;
+    console.log("isBeforeAllowedTime", isBeforeAllowedTime);
+
+    // Are we past the limit?
+    const isPastLimit = state.secondsOn > MAX_TIME_PER_DAY_SECONDS;
+    console.log("isPastLimit", isPastLimit);
+
+    // Are we past the always allowed time?
+    const isPastAlwaysAllowedTime = secondsSinceMidnight > ALLOW_AFTER_TIME;
     console.log("isPastAlwaysAllowedTime", isPastAlwaysAllowedTime);
 
     // If we're past the limit, turn off the TV
@@ -71,12 +76,18 @@ const check = async () => {
         console.log(res);
         lgtv.disconnect();
       });
+    } else if (isBeforeAllowedTime) {
+      console.log("TV is on before the allowed time, turning off");
+      lgtv.request("ssap://system/turnOff", function (err, res) {
+        console.log(res);
+        lgtv.disconnect();
+      });
     } else {
-      console.log("TV is on, but not past the limit");
+      console.log("TV is on, but no limits were hit");
       lgtv.disconnect();
     }
   });
 };
 
 check();
-setInterval(check, INTERVAL);
+setInterval(check, INTERVAL_SECONDS * 1000);
