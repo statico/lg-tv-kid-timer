@@ -10,7 +10,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@types/express": "^5.0.0",
     "dotenv": "^16.4.7",
+    "express": "^4.21.2",
     "lgtv2": "^1.6.3"
   },
   "devDependencies": {

@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import LGTV from "lgtv2";
 import { readFileSync, writeFileSync } from "fs";
+import express from "express";
 dotenv.config();
 
 const HOST = process.env.TV_HOST || "lgwebostv";
@@ -9,8 +10,63 @@ const MAX_TIME_PER_DAY_SECONDS = 60 * 60; // 1 hour
 const ALLOW_AFTER_TIME = (19 * 60 + 30) * 60; // 7:30 PM
 const DISALLOW_BEFORE_TIME = 8 * 60 * 60; // 8:00 AM
 
+// Add Express setup
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+// Add state interface
+interface TVState {
+  date: string;
+  secondsOn: number;
+  isOn: boolean;
+  lastChecked: string;
+}
+
+let globalState: TVState = {
+  date: new Date().toISOString(),
+  secondsOn: 0,
+  isOn: false,
+  lastChecked: new Date().toISOString(),
+};
+
+// Add routes
+app.get("/", (req, res) => {
+  const currentTime = new Date();
+  const secondsSinceMidnight =
+    currentTime.getHours() * 3600 +
+    currentTime.getMinutes() * 60 +
+    currentTime.getSeconds();
+
+  res.send(`
+    <html>
+      <head>
+        <title>TV Status</title>
+        <meta http-equiv="refresh" content="${INTERVAL_SECONDS}">
+        <style>
+          body { font-family: Arial, sans-serif; margin: 2em; }
+          .status { padding: 1em; margin: 1em 0; border-radius: 4px; }
+          .on { background: #e6ffe6; }
+          .off { background: #ffe6e6; }
+        </style>
+      </head>
+      <body>
+        <h1>TV Status Monitor</h1>
+        <div class="status ${globalState.isOn ? "on" : "off"}">
+          <p>TV is currently: <strong>${globalState.isOn ? "ON" : "OFF"}</strong></p>
+          <p>Time watched today: ${Math.floor(globalState.secondsOn / 60)} minutes</p>
+          <p>Time remaining: ${Math.floor((MAX_TIME_PER_DAY_SECONDS - globalState.secondsOn) / 60)} minutes</p>
+          <p>Current time: ${currentTime.toLocaleTimeString()}</p>
+          <p>Allowed between: ${new Date(DISALLOW_BEFORE_TIME * 1000).toLocaleTimeString()} and ${new Date(ALLOW_AFTER_TIME * 1000).toLocaleTimeString()}</p>
+          <p>Last checked: ${new Date(globalState.lastChecked).toLocaleTimeString()}</p>
+        </div>
+      </body>
+    </html>
+  `);
+});
+
 const check = async () => {
   console.log("Checking...", new Date().toISOString());
+  globalState.lastChecked = new Date().toISOString();
 
   const lgtv = LGTV({
     url: `ws://${HOST}:3000`,
@@ -20,12 +76,14 @@ const check = async () => {
 
   lgtv.on("error", function (err) {
     console.log("TV is off");
+    globalState.isOn = false;
     lgtv.disconnect();
   });
 
   lgtv.on("connect", function () {
     // TV is on
     console.log("Connected");
+    globalState.isOn = true;
 
     // Read state.json. If it doesn't exist, create it with the current time
     let state: any;
@@ -51,6 +109,13 @@ const check = async () => {
 
     // Write state.json
     writeFileSync("state.json", JSON.stringify(state));
+
+    // Update global state
+    globalState = {
+      ...globalState,
+      date: state.date,
+      secondsOn: state.secondsOn,
+    };
 
     // Are we before the allowed time?
     const currentTime = new Date();
@@ -89,5 +154,11 @@ const check = async () => {
   });
 };
 
+// Start the Express server
+app.listen(PORT, () => {
+  console.log(`Server running at http://localhost:${PORT}`);
+});
+
+// Start the TV checking
 check();
 setInterval(check, INTERVAL_SECONDS * 1000);
