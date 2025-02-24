@@ -42,6 +42,14 @@ app.get("/", (req, res) => {
     currentTime.getMinutes() * 60 +
     currentTime.getSeconds();
 
+  // Add this helper to format the restriction time correctly
+  const restrictTimeString = () => {
+    const hours = Math.floor(VOLUME_RESTRICT_TIME / 3600);
+    const today = new Date();
+    today.setHours(hours, 0, 0, 0);
+    return today.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  };
+
   res.send(`
     <html>
       <head>
@@ -130,7 +138,7 @@ app.get("/", (req, res) => {
             <p>Volume: ${globalState.volume !== undefined ? globalState.volume : "Unknown"}</p>
             <p>Volume restrictions: ${
               secondsSinceMidnight < VOLUME_RESTRICT_TIME
-                ? `Limited to ${MAX_VOLUME} until ${new Date(VOLUME_RESTRICT_TIME * 1000).toLocaleTimeString()}`
+                ? `Limited to ${MAX_VOLUME} until ${restrictTimeString()}`
                 : "No restrictions"
             }</p>
             <form action="/volume/up" method="post" style="display: inline;">
