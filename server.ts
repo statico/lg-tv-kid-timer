@@ -21,6 +21,7 @@ interface TVState {
   isOn: boolean;
   lastChecked: string;
   enabled: boolean;
+  volume?: number;
 }
 
 let globalState: TVState = {
@@ -90,6 +91,21 @@ app.get("/", (req, res) => {
           input:checked + .slider:before {
             transform: translateX(26px);
           }
+          button {
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0 4px;
+          }
+          button:hover {
+            background-color: #1976D2;
+          }
+          .volume-controls {
+            margin-top: 1em;
+          }
         </style>
       </head>
       <body>
@@ -108,6 +124,15 @@ app.get("/", (req, res) => {
           <p>Current time: ${currentTime.toLocaleTimeString()}</p>
           <p>Allowed between: ${new Date(DISALLOW_BEFORE_TIME * 1000).toLocaleTimeString()} and ${new Date(ALLOW_AFTER_TIME * 1000).toLocaleTimeString()}</p>
           <p>Last checked: ${new Date(globalState.lastChecked).toLocaleTimeString()}</p>
+          <div class="volume-controls">
+            <p>Volume: ${globalState.volume !== undefined ? globalState.volume : "Unknown"}</p>
+            <form action="/volume/up" method="post" style="display: inline;">
+              <button type="submit">Volume Up</button>
+            </form>
+            <form action="/volume/down" method="post" style="display: inline;">
+              <button type="submit">Volume Down</button>
+            </form>
+          </div>
         </div>
       </body>
     </html>
@@ -187,46 +212,55 @@ const check = async () => {
       enabled: state.enabled,
     };
 
-    // Only enforce limits if enabled
-    if (state.enabled) {
-      // Are we before the allowed time?
-      const currentTime = new Date();
-      const secondsSinceMidnight =
-        currentTime.getHours() * 3600 +
-        currentTime.getMinutes() * 60 +
-        currentTime.getSeconds();
-      const isBeforeAllowedTime = secondsSinceMidnight < DISALLOW_BEFORE_TIME;
-      console.log("isBeforeAllowedTime", isBeforeAllowedTime);
+    // After reading the state but before the time limit checks:
+    lgtv.request("ssap://audio/getVolume", function (err, res) {
+      if (!err && res) {
+        state.volume = res.volume;
+        globalState.volume = res.volume;
+        writeFileSync("state.json", JSON.stringify(state));
+      }
 
-      // Are we past the limit?
-      const isPastLimit = state.secondsOn > MAX_TIME_PER_DAY_SECONDS;
-      console.log("isPastLimit", isPastLimit);
+      // Only enforce limits if enabled
+      if (state.enabled) {
+        // Are we before the allowed time?
+        const currentTime = new Date();
+        const secondsSinceMidnight =
+          currentTime.getHours() * 3600 +
+          currentTime.getMinutes() * 60 +
+          currentTime.getSeconds();
+        const isBeforeAllowedTime = secondsSinceMidnight < DISALLOW_BEFORE_TIME;
+        console.log("isBeforeAllowedTime", isBeforeAllowedTime);
 
-      // Are we past the always allowed time?
-      const isPastAlwaysAllowedTime = secondsSinceMidnight > ALLOW_AFTER_TIME;
-      console.log("isPastAlwaysAllowedTime", isPastAlwaysAllowedTime);
+        // Are we past the limit?
+        const isPastLimit = state.secondsOn > MAX_TIME_PER_DAY_SECONDS;
+        console.log("isPastLimit", isPastLimit);
 
-      // If we're past the limit, turn off the TV
-      if (isPastLimit && !isPastAlwaysAllowedTime) {
-        console.log("TV is on past the limit, turning off");
-        lgtv.request("ssap://system/turnOff", function (err, res) {
-          console.log(res);
+        // Are we past the always allowed time?
+        const isPastAlwaysAllowedTime = secondsSinceMidnight > ALLOW_AFTER_TIME;
+        console.log("isPastAlwaysAllowedTime", isPastAlwaysAllowedTime);
+
+        // If we're past the limit, turn off the TV
+        if (isPastLimit && !isPastAlwaysAllowedTime) {
+          console.log("TV is on past the limit, turning off");
+          lgtv.request("ssap://system/turnOff", function (err, res) {
+            console.log(res);
+            lgtv.disconnect();
+          });
+        } else if (isBeforeAllowedTime) {
+          console.log("TV is on before the allowed time, turning off");
+          lgtv.request("ssap://system/turnOff", function (err, res) {
+            console.log(res);
+            lgtv.disconnect();
+          });
+        } else {
+          console.log("TV is on, but no limits were hit");
           lgtv.disconnect();
-        });
-      } else if (isBeforeAllowedTime) {
-        console.log("TV is on before the allowed time, turning off");
-        lgtv.request("ssap://system/turnOff", function (err, res) {
-          console.log(res);
-          lgtv.disconnect();
-        });
+        }
       } else {
-        console.log("TV is on, but no limits were hit");
+        console.log("Limits are disabled");
         lgtv.disconnect();
       }
-    } else {
-      console.log("Limits are disabled");
-      lgtv.disconnect();
-    }
+    });
   });
 };
 
@@ -238,3 +272,36 @@ app.listen(PORT, () => {
 // Start the TV checking
 check();
 setInterval(check, INTERVAL_SECONDS * 1000);
+
+// Add new routes after the existing routes
+app.post("/volume/up", (req, res) => {
+  const lgtv = LGTV({
+    url: `ws://${HOST}:3000`,
+    timeout: 1000,
+    reconnect: 0,
+  });
+
+  lgtv.on("connect", function () {
+    lgtv.request("ssap://audio/volumeUp", function (err, res) {
+      lgtv.disconnect();
+    });
+  });
+
+  res.redirect("/");
+});
+
+app.post("/volume/down", (req, res) => {
+  const lgtv = LGTV({
+    url: `ws://${HOST}:3000`,
+    timeout: 1000,
+    reconnect: 0,
+  });
+
+  lgtv.on("connect", function () {
+    lgtv.request("ssap://audio/volumeDown", function (err, res) {
+      lgtv.disconnect();
+    });
+  });
+
+  res.redirect("/");
+});
