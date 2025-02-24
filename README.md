@@ -2,7 +2,7 @@
 
 Control LG TV usage because it has no parental control for time limit.
 
-![image](https://github.com/user-attachments/assets/d2743bdd-8747-46e0-bb84-3f353bebb6c9)
+<img src="https://github.com/user-attachments/assets/d2743bdd-8747-46e0-bb84-3f353bebb6c9" width="300"/>
 
 This Node.js application connects to an LG WebOS TV via websocket to enforce daily screen time limits. Features:
 
