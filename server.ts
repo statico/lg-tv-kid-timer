@@ -9,6 +9,8 @@ const INTERVAL_SECONDS = 5;
 const MAX_TIME_PER_DAY_SECONDS = 60 * 60; // 1 hour
 const ALLOW_AFTER_TIME = (19 * 60 + 30) * 60; // 7:30 PM
 const DISALLOW_BEFORE_TIME = 8 * 60 * 60; // 8:00 AM
+const VOLUME_RESTRICT_TIME = 20 * 60 * 60; // 8:00 PM in seconds
+const MAX_VOLUME = 5;
 
 // Add Express setup
 const app = express();
@@ -126,6 +128,11 @@ app.get("/", (req, res) => {
           <p>Last checked: ${new Date(globalState.lastChecked).toLocaleTimeString()}</p>
           <div class="volume-controls">
             <p>Volume: ${globalState.volume !== undefined ? globalState.volume : "Unknown"}</p>
+            <p>Volume restrictions: ${
+              secondsSinceMidnight < VOLUME_RESTRICT_TIME
+                ? `Limited to ${MAX_VOLUME} until ${new Date(VOLUME_RESTRICT_TIME * 1000).toLocaleTimeString()}`
+                : "No restrictions"
+            }</p>
             <form action="/volume/up" method="post" style="display: inline;">
               <button type="submit">Volume Up</button>
             </form>
@@ -212,12 +219,35 @@ const check = async () => {
       enabled: state.enabled,
     };
 
-    // After reading the state but before the time limit checks:
+    // Replace the existing volume check with this updated version:
     lgtv.request("ssap://audio/getVolume", function (err, res) {
       if (!err && res) {
         state.volume = res.volume;
         globalState.volume = res.volume;
         writeFileSync("state.json", JSON.stringify(state));
+
+        // Check if we need to restrict volume
+        const currentTime = new Date();
+        const secondsSinceMidnight =
+          currentTime.getHours() * 3600 +
+          currentTime.getMinutes() * 60 +
+          currentTime.getSeconds();
+
+        if (
+          secondsSinceMidnight < VOLUME_RESTRICT_TIME &&
+          res.volume > MAX_VOLUME
+        ) {
+          console.log(
+            `Volume ${res.volume} exceeds max ${MAX_VOLUME}, reducing volume`
+          );
+          lgtv.request(
+            "ssap://audio/setVolume",
+            { volume: MAX_VOLUME },
+            function (err, res) {
+              if (err) console.log("Error setting volume:", err);
+            }
+          );
+        }
       }
 
       // Only enforce limits if enabled
