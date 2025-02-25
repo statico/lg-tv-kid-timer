@@ -173,6 +173,25 @@ const check = async () => {
   console.log("Checking...", new Date().toISOString());
   globalState.lastChecked = new Date().toISOString();
 
+  // Add check for 4am reset
+  const currentTime = new Date();
+  const hours = currentTime.getHours();
+  const minutes = currentTime.getMinutes();
+
+  if (hours === 4 && minutes === 0) {
+    try {
+      const state = JSON.parse(readFileSync("state.json", "utf8"));
+      if (!state.enabled) {
+        state.enabled = true;
+        writeFileSync("state.json", JSON.stringify(state));
+        globalState.enabled = true;
+        console.log("Re-enabled TV limits at 4am");
+      }
+    } catch (e) {
+      console.error("Error checking/updating enabled state at 4am:", e);
+    }
+  }
+
   const lgtv = LGTV({
     url: `ws://${HOST}:3000`,
     timeout: 1000,
